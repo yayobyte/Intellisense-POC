@@ -1,0 +1,28 @@
+.input-container {
+  display: relative;
+  border: 1px solid #ccc; 
+  padding: 10px; 
+  border-radius: 5px; 
+  margin: 40px;
+}
+
+.react-autosuggest__input {
+  flex-grow: 1; 
+  border: none; 
+  padding: 5px; 
+}
+
+.react-autosuggest__suggestions-container {
+  background-color: white; 
+  border: 1px solid #ccc; 
+  border-radius: 5px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.react-autosuggest__suggestion--highlighted {
+  background-color: #f2f2f2; 
+}
+
+.react-autosuggest__suggestions-list li {
+  list-style: none;
+}

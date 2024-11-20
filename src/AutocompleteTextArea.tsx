@@ -132,18 +132,7 @@ const AutocompleteTextArea = ({ options, onChange, defaultTrigger = DEFAULT_TRIG
     };
 
     enhanceSuggestions();
-
-    // // Re-run when suggestions change
-    // const observer = new MutationObserver(enhanceSuggestions);
-    // const target = document.querySelector(".react-autocomplete-input");
-    // if (target) {
-    //   observer.observe(target, { childList: true });
-    // }
-
-    // return () => {
-    //   observer.disconnect();
-    // };
-  }, [options, value, currentSuggestions]);
+  }, [options, value, currentSuggestions, currentOption]);
 
   return (
     <div className="autocomplete-container">

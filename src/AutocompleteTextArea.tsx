@@ -7,86 +7,74 @@ import {
 import AutocompleteInput from "react-autocomplete-input";
 import "react-autocomplete-input/dist/bundle.css";
 import "./AutocompleteTextArea.css";
+import { TOption } from "./AutocompleteTextArea.types";
+import { DEFAULT_TRIGGER, findOptionForTrigger, generateTriggers } from "./helpers";
 
-const DEFAULT_TRIGGER = '{{context.';
-const listOfTriggers = [DEFAULT_TRIGGER];
-
-// Example props data
-const externalOptions = [
-  {
-    type: 'entity',
-    value: 'customer',
-    options: [
-      { type: 'entity', value: 'name' },
-      { type: 'entity', value: 'age' },
-      { type: 'entity', value: 'phone' },
-      {
-        type: 'function',
-        value: 'getAddress',
-        options: [
-          { type: 'query', value: 'zip' },
-        ]
-      }
-    ]
-  },
-  {
-    type: 'entity',
-    value: 'location',
-    options: [
-      { type: 'entity', value: 'lat' },
-      { type: 'entity', value: 'lon' },
-      { type: 'function', value: 'getFormattedLocation' },
-    ]
-  }
-];
-
-// Recursive function to generate the list of triggers
-const generateTriggers = (options, parent = '') => {
-  let triggers = [];
-
-  options.forEach(option => {
-    const currentTrigger = `${parent}${option.value}.`;
-
-    triggers.push(`${DEFAULT_TRIGGER}${currentTrigger}`);
-
-    if (option.options && option.options.length > 0) {
-      triggers = triggers.concat(generateTriggers(option.options, currentTrigger));
-    }
-  });
-
-  return triggers;
+type AutocompleteTextAreaProps = {
+  options: TOption[];
+  onChange: (value: string) => void
+  defaultTrigger?: string
 };
 
-const AutocompleteTextArea = () => {
-  const { options } = { options: externalOptions} //Use Props
+const AutocompleteTextArea = ({ options, onChange, defaultTrigger = DEFAULT_TRIGGER }: AutocompleteTextAreaProps) => {
   const [value, setValue] = useState("");
-  const [listOfTriggers, setListOfTriggers] = useState<string[]>([]);
-  const [currentTrigger, setCurrentTrigger] = useState(DEFAULT_TRIGGER);  // Tracks the current context trigger
+  const [listOfTriggers, setListOfTriggers] = useState<string[]>([defaultTrigger]);
   const [currentSuggestions, setCurrentSuggestions] = useState<string[]>([]); // Tracks suggestions based on current trigger
   const [cursorIndex, setCursorIndex] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
 
   const formattedRef = useRef<HTMLDivElement | null>(null);
 
+  // Reset suggestions to top level if at root context ({{context.})
+  const resetSuggestions = useCallback(() => {
+    setCurrentSuggestions(options.map(option => option.value));
+  }, [options])
+
+  const onChangeValue = (value: string) => {
+    setValue(value)
+    onChange(value)
+  }
+
+  // Handle selection of trigger and suggestion
   const handleSelect = (trigger: string, suggestion: string) => {
-    const input = `${trigger}${suggestion}.`
+    const input = `${trigger}${suggestion}.`;
     const beforeCursor = value.substring(0, cursorIndex);
     const afterCursor = value.substring(cursorIndex);
-
-    // Check if the suggestion belong to any of the triggers
-    const shouldAddClosing = !listOfTriggers.includes(input)
-
+  
+    const shouldAddClosing = !listOfTriggers.includes(input);
+  
     const newValue = `${beforeCursor}${trigger}${suggestion}}}${afterCursor.trimEnd()}`;
-    setValue(newValue);
+    onChangeValue(newValue);
     setCursorIndex(beforeCursor.length + trigger.length + suggestion.length + 2);
+  
+    const newTrigger = `${trigger}${suggestion}.`;
+  
+    // Check if the trigger reached the top-level and reset suggestions
+    if (newTrigger === defaultTrigger) {
+      resetSuggestions();
+    } else {
+      // Find the option corresponding to the selected trigger
+      const currentOption = findOptionForTrigger(newTrigger, options);
+      
+      if (currentOption) {
+        // If the selected option has sub-options, update the suggestions list
+        if (currentOption.options && currentOption.options.length > 0) {
+          setCurrentSuggestions(currentOption.options.map(option => option.value));
+        } else {
+          resetSuggestions()
+        }
+      }
+    }
+
     return `${trigger}${suggestion}${shouldAddClosing ? '}}' : ''}`;
   };
-
+  
   const handleChange = (val: string) => {
-    setValue(val);
+    onChangeValue(val);
     setCursorIndex(val.length);
   };
 
+  // Format the text for display (highlight triggers)
   const formatText = useCallback((text: string) => {
     const escapedTriggers = listOfTriggers.map(t => t.replace(/[.*+?^=!:${}()|\[\]\/\\]/g, '\\$&'));
   
@@ -95,10 +83,10 @@ const AutocompleteTextArea = () => {
     return text.replace(regex, (match) => `<strong>${match}</strong>`);
   }, [listOfTriggers]);
 
-
+  // Handle click event on formatted text
   const handleFormattedTextClick = () => {
     setIsFocused(true);
-    const textarea = document.querySelector<HTMLTextAreaElement>(".autocomplete-input"); //External Refs can not be used
+    const textarea = document.querySelector<HTMLTextAreaElement>(".autocomplete-input");
     if (textarea) {
       textarea.focus();
       const valueLength = textarea.value.length;
@@ -106,34 +94,12 @@ const AutocompleteTextArea = () => {
     }
   };
 
-useEffect(() => {
-    const triggers = generateTriggers(options);
-    setListOfTriggers([DEFAULT_TRIGGER, ...triggers]);
-}, [options]);
-
+  // Update list of triggers and suggestions based on selected context
   useEffect(() => {
-  // Find the current suggestion options based on the current trigger
-  const findOptionForTrigger = (trigger: string, options: any[]) => {
-    for (let option of options) {
-      if (`${DEFAULT_TRIGGER}${option.value}.` === trigger) {
-        return option;
-      }
-      if (option.options) {
-        const found = findOptionForTrigger(trigger, option.options);
-        if (found) return found;
-      }
-    }
-    return null;
-  };
-
-  const currentOption = findOptionForTrigger(currentTrigger, options);
-  if (currentOption) {
-    setCurrentSuggestions(currentOption.options ? currentOption.options.map(option => option.value) : []);
-  }
-  }, [currentTrigger, options]);
-
- console.log(listOfTriggers)
- console.log(currentSuggestions)
+    const triggers = generateTriggers(options);
+    setListOfTriggers([defaultTrigger, ...triggers]);
+    resetSuggestions(); // Reset to top-level suggestions on mount
+  }, [options, resetSuggestions]);
 
   return (
     <div className="autocomplete-container">
@@ -141,7 +107,7 @@ useEffect(() => {
         spacer=""
         matchAny={true}
         trigger={listOfTriggers}
-        options={currentSuggestions}  // Dynamically updated suggestions
+        options={currentSuggestions}
         value={value}
         onChange={handleChange}
         changeOnSelect={handleSelect}

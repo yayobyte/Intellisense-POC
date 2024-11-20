@@ -1,105 +1,166 @@
-import React, {
+import {
   useState,
   useRef,
-  useContext,
   useCallback,
-  useMemo,
   useEffect,
 } from "react";
 import AutocompleteInput from "react-autocomplete-input";
-import ConversationContext from "./ConversationContext";
 import "react-autocomplete-input/dist/bundle.css";
 import "./AutocompleteTextArea.css";
 
-const DEFAULT_TRIGGER = '{{context.'
-const trigger = [DEFAULT_TRIGGER]
+const DEFAULT_TRIGGER = '{{context.';
+const listOfTriggers = [DEFAULT_TRIGGER];
 
-const TextAreaInput = (props: TextareaProps) => {
-    return (
-        <textarea {...props}/>
-    )
-}
+// Example props data
+const externalOptions = [
+  {
+    type: 'entity',
+    value: 'customer',
+    options: [
+      { type: 'entity', value: 'name' },
+      { type: 'entity', value: 'age' },
+      { type: 'entity', value: 'phone' },
+      {
+        type: 'function',
+        value: 'getAddress',
+        options: [
+          { type: 'query', value: 'zip' },
+        ]
+      }
+    ]
+  },
+  {
+    type: 'entity',
+    value: 'location',
+    options: [
+      { type: 'entity', value: 'lat' },
+      { type: 'entity', value: 'lon' },
+      { type: 'function', value: 'getFormattedLocation' },
+    ]
+  }
+];
+
+// Recursive function to generate the list of triggers
+const generateTriggers = (options, parent = '') => {
+  let triggers = [];
+
+  options.forEach(option => {
+    const currentTrigger = `${parent}${option.value}.`;
+
+    triggers.push(`${DEFAULT_TRIGGER}${currentTrigger}`);
+
+    if (option.options && option.options.length > 0) {
+      triggers = triggers.concat(generateTriggers(option.options, currentTrigger));
+    }
+  });
+
+  return triggers;
+};
 
 const AutocompleteTextArea = () => {
-  const { customer } = useContext(ConversationContext);
+  const { options } = { options: externalOptions} //Use Props
   const [value, setValue] = useState("");
-  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [listOfTriggers, setListOfTriggers] = useState<string[]>([]);
+  const [currentTrigger, setCurrentTrigger] = useState(DEFAULT_TRIGGER);  // Tracks the current context trigger
+  const [currentSuggestions, setCurrentSuggestions] = useState<string[]>([]); // Tracks suggestions based on current trigger
   const [cursorIndex, setCursorIndex] = useState(0);
-  
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [isFocused, setIsFocused] = useState(false);
+
   const formattedRef = useRef<HTMLDivElement | null>(null);
-  const cursorRef = useRef<HTMLSpanElement | null>(null);
-  
+
   const handleSelect = (trigger: string, suggestion: string) => {
+    const input = `${trigger}${suggestion}.`
     const beforeCursor = value.substring(0, cursorIndex);
     const afterCursor = value.substring(cursorIndex);
-    const newValue = `${beforeCursor}${trigger}${suggestion}}}${afterCursor}`;
+
+    // Check if the suggestion belong to any of the triggers
+    const shouldAddClosing = !listOfTriggers.includes(input)
+
+    const newValue = `${beforeCursor}${trigger}${suggestion}}}${afterCursor.trimEnd()}`;
     setValue(newValue);
     setCursorIndex(beforeCursor.length + trigger.length + suggestion.length + 2);
-    return `${trigger}${suggestion}}}`;
+    return `${trigger}${suggestion}${shouldAddClosing ? '}}' : ''}`;
   };
 
   const handleChange = (val: string) => {
     setValue(val);
-    setCursorIndex(val.length); // Assumes cursor is always at the end; adjust for custom behavior.
+    setCursorIndex(val.length);
   };
 
-  const updateCursor = useCallback(() => {
-    if (cursorRef.current && formattedRef.current) {
-      const textBeforeCursor = value.slice(0, cursorIndex);
-      const span = document.createElement("span");
-      span.textContent = textBeforeCursor;
-
-      const range = document.createRange();
-      const dummySpan = document.createElement("span");
-      dummySpan.style.visibility = "hidden";
-      dummySpan.textContent = textBeforeCursor;
-
-      formattedRef.current.appendChild(dummySpan);
-      const { width, height } = dummySpan.getBoundingClientRect();
-      cursorRef.current.style.left = `${width}px`;
-      cursorRef.current.style.top = `${height}px`;
-      formattedRef.current.removeChild(dummySpan);
-    }
-  }, [cursorIndex, value]);
-
   const formatText = useCallback((text: string) => {
-    return text.replace(
-      /{{context\.\w+}}/g,
-      (match) => `<strong>${match}</strong>`
-    );
-  }, []);
+    const escapedTriggers = listOfTriggers.map(t => t.replace(/[.*+?^=!:${}()|\[\]\/\\]/g, '\\$&'));
+  
+    const regexPattern = `(${escapedTriggers.join('|')})[\\w.-]+}}`; // Match trigger followed by key and closing }}
+    const regex = new RegExp(regexPattern, 'g');
+    return text.replace(regex, (match) => `<strong>${match}</strong>`);
+  }, [listOfTriggers]);
+
+
+  const handleFormattedTextClick = () => {
+    setIsFocused(true);
+    const textarea = document.querySelector<HTMLTextAreaElement>(".autocomplete-input"); //External Refs can not be used
+    if (textarea) {
+      textarea.focus();
+      const valueLength = textarea.value.length;
+      textarea.setSelectionRange(valueLength, valueLength);
+    }
+  };
+
+useEffect(() => {
+    const triggers = generateTriggers(options);
+    setListOfTriggers([DEFAULT_TRIGGER, ...triggers]);
+}, [options]);
 
   useEffect(() => {
-    const newSuggestions = Object.keys(customer).map((key) => key);
-    setSuggestions(newSuggestions);
-  }, [customer])
+  // Find the current suggestion options based on the current trigger
+  const findOptionForTrigger = (trigger: string, options: any[]) => {
+    for (let option of options) {
+      if (`${DEFAULT_TRIGGER}${option.value}.` === trigger) {
+        return option;
+      }
+      if (option.options) {
+        const found = findOptionForTrigger(trigger, option.options);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
 
-  useEffect(() => {
-    updateCursor();
-  }, [value, cursorIndex, updateCursor]);
+  const currentOption = findOptionForTrigger(currentTrigger, options);
+  if (currentOption) {
+    setCurrentSuggestions(currentOption.options ? currentOption.options.map(option => option.value) : []);
+  }
+  }, [currentTrigger, options]);
+
+ console.log(listOfTriggers)
+ console.log(currentSuggestions)
 
   return (
     <div className="autocomplete-container">
+      <AutocompleteInput
+        spacer=""
+        matchAny={true}
+        trigger={listOfTriggers}
+        options={currentSuggestions}  // Dynamically updated suggestions
+        value={value}
+        onChange={handleChange}
+        changeOnSelect={handleSelect}
+        className={`autocomplete-input plain-textarea ${
+          isFocused ? "" : "hidden"
+        }`}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
+      />
       <div
-        className="formatted-text"
+        className={`formatted-text ${isFocused ? "" : "visible"}`}
         ref={formattedRef}
-        onClick={() => textareaRef.current?.focus()}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={handleFormattedTextClick}
       >
         <span
           dangerouslySetInnerHTML={{ __html: formatText(value) }}
         />
-        <span ref={cursorRef} className="cursor">&#8203;</span>
       </div>
-      <AutocompleteInput
-        matchAny={true}
-        trigger={trigger}
-        options={suggestions}
-        value={value}
-        onChange={handleChange}
-        changeOnSelect={handleSelect}
-        className="autocomplete-input plain-textarea"
-      />
     </div>
   );
 };

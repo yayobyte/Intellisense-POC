@@ -1,5 +1,5 @@
 export type TOption = {
     value: string;
-    name?: string;
+    type: string;
     options?: TOption[];
-  };
+};

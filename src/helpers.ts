@@ -41,3 +41,42 @@ export const findOptionForTrigger = (trigger: string, options: TOption[], parent
   
     return null; 
   };
+
+export const findOptionRecursive = (value: string, options: TOption[]): TOption | null => {
+    for (const option of options) {
+      if (option.value === value) {
+        return option;
+      }
+      if (option.options) {
+        const found = findOptionRecursive(value, option.options);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
+  export function createFlexContainer(): HTMLDivElement {
+    const flexContainer = document.createElement("div");
+    flexContainer.className = "suggestion-content";
+    flexContainer.style.display = "flex";
+    flexContainer.style.justifyContent = "space-between";
+    flexContainer.style.alignItems = "center";
+    flexContainer.style.width = "100%";
+    return flexContainer;
+  }
+  
+  export function createSuggestionSpan(text: string): HTMLSpanElement {
+    const suggestionSpan = document.createElement("span");
+    suggestionSpan.textContent = text;
+    return suggestionSpan;
+  }
+  
+  export function createCustomSpan(type: string): HTMLSpanElement {
+    const customSpan = document.createElement("span");
+    customSpan.textContent = type;
+    customSpan.style.marginLeft = "10px";
+    customSpan.style.color = "#888";
+    customSpan.style.fontWeight = "400";
+    return customSpan;
+  }
+  

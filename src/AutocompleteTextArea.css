@@ -87,6 +87,9 @@
   padding: 4px;
   min-width: 100px;
   height: 20px;
+  font-weight: bold;
+  flex-direction: row;
+  justify-content: space-between;
 }
 
 .react-autocomplete-input > li.active {

@@ -1,6 +1,7 @@
 import AutocompleteTextarea from "./AutocompleteTextArea";
+import { TOption } from "./AutocompleteTextArea.types";
 
-const options = [
+const options: TOption[] = [
   {
     type: 'entity',
     value: 'customer',

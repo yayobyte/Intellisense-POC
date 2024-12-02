@@ -1,48 +1,45 @@
-import { TOption } from "./AutocompleteTextArea.types";
-
-export const DEFAULT_TRIGGER = '{{context.';
+import { TSuggestion } from "./AutocompleteTextArea.types";
 
 // Recursive function to generate the list of triggers
-export const generateTriggers = (options: TOption[], parent = '') => {
+export const generateTriggers = (options: TSuggestion[], defaultTrigger: string, parent = '', ) => {
     let triggers: string[] = [];
-  
-    options.forEach(option => {
+
+    options?.forEach(option => {
       const currentTrigger = `${parent}${option.value}.`;
-  
+
       // Only add triggers with sub-options
       if (option.options && option.options.length > 0) {
-        triggers.push(`${DEFAULT_TRIGGER}${currentTrigger}`);
+        triggers.push(`${defaultTrigger}${currentTrigger}`);
       }
-      
+
       if (option.options && option.options.length > 0) {
-        triggers = triggers.concat(generateTriggers(option.options, currentTrigger));
+        triggers = triggers.concat(generateTriggers(option.options, defaultTrigger, currentTrigger));
       }
     });
-  
+
     return triggers;
   };
-  
-export const findOptionForTrigger = (trigger: string, options: TOption[], parent = ''):TOption | null => {
+
+  export const findOptionForTrigger = (
+    trigger: string,
+    options: TSuggestion[],
+    defaultTrigger: string
+  ): TSuggestion | null => {
     for (const option of options) {
-      // Dynamically construct the current trigger based on the parent
-      const currentTrigger = `${parent}${option.value}.`;
-  
-      // Check if this is the target trigger
-      if (trigger === `${DEFAULT_TRIGGER}${currentTrigger}`) {
-        return option; // Exact match found
+      if (`${defaultTrigger}${option.trigger}` === trigger) {
+        return option;
       }
-  
-      // Recurse deeper into options if there are sub-options
-      if (option.options && trigger.startsWith(`${DEFAULT_TRIGGER}${currentTrigger}`)) {
-        const found = findOptionForTrigger(trigger, option.options, currentTrigger);
+      // Recurse deeper if the option has sub-options
+      if (option.options) {
+        const found = findOptionForTrigger(trigger, option.options, defaultTrigger);
         if (found) return found;
       }
     }
-  
-    return null; 
+    return null;
   };
+  
 
-export const findOptionRecursive = (value: string, options: TOption[]): TOption | null => {
+export const findOptionRecursive = (value: string, options: TSuggestion[]): TSuggestion | null => {
     for (const option of options) {
       if (option.value === value) {
         return option;
@@ -64,13 +61,13 @@ export const findOptionRecursive = (value: string, options: TOption[]): TOption 
     flexContainer.style.width = "100%";
     return flexContainer;
   }
-  
+
   export function createSuggestionSpan(text: string): HTMLSpanElement {
     const suggestionSpan = document.createElement("span");
     suggestionSpan.textContent = text;
     return suggestionSpan;
   }
-  
+
   export function createCustomSpan(type: string): HTMLSpanElement {
     const customSpan = document.createElement("span");
     customSpan.textContent = type;
@@ -79,4 +76,14 @@ export const findOptionRecursive = (value: string, options: TOption[]): TOption 
     customSpan.style.fontWeight = "400";
     return customSpan;
   }
-  
+
+  export const findActiveTriggerContext = (text: string, cursorIndex: number, listOfTriggers: string[]) => {
+    // Find the last trigger before the cursor
+    for (let i = cursorIndex; i >= 0; i--) {
+      const slice = text.slice(i, cursorIndex);
+      if (listOfTriggers.includes(slice)) {
+        return { trigger: slice, startIndex: i };
+      }
+    }
+    return null;
+  };

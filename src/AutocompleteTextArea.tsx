@@ -3,127 +3,150 @@ import {
   useRef,
   useCallback,
   useEffect,
+  forwardRef,
 } from "react";
-import AutocompleteInput from "react-autocomplete-input";
-import "react-autocomplete-input/dist/bundle.css";
-import "./AutocompleteTextArea.css";
-import { TOption } from "./AutocompleteTextArea.types";
-import { createCustomSpan, createFlexContainer, createSuggestionSpan, DEFAULT_TRIGGER, findOptionForTrigger, generateTriggers } from "./helpers";
+import AutocompleteInput from "./AutocompleteTextAreaCore";
+import { TSuggestion } from "./AutocompleteTextArea.types";
+import { createCustomSpan, createFlexContainer, createSuggestionSpan, findOptionForTrigger as findSuggestionForTrigger, generateTriggers, findActiveTriggerContext } from "./helpers";
+
+type TextareaProps = React.TextareaHTMLAttributes<HTMLTextAreaElement>;
+
+const ForwardedTextarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
+  ({ className, ...props  }, ref) => {
+    return <textarea
+      {...props}
+      ref={ref}
+      rows={4}
+      className={`${className} focus:outline-none focus:ring-8 focus:ring-gray-400 focus:border-gray-400 rounded-md focus:rounded-md h-full`} />;
+  }
+);
 
 type AutocompleteTextAreaProps = {
-  options: TOption[];
-  onChange: (value: string) => void
-  defaultTrigger?: string
+  initialValue?: string;
+  options: TSuggestion[];
+  onChange: (value: string) => void;
+  defaultTrigger?: string;
+  id?: string;
 };
 
-const AutocompleteTextArea = ({ options, onChange, defaultTrigger = DEFAULT_TRIGGER }: AutocompleteTextAreaProps) => {
-  const [value, setValue] = useState("");
+const DEFAULT_TRIGGER = '{{context.';
+
+const AutocompleteTextArea = ({
+  options,
+  onChange,
+  defaultTrigger = DEFAULT_TRIGGER,
+  initialValue = "",
+  id = "",
+}: AutocompleteTextAreaProps) => {
+  const [value, setValue] = useState(initialValue);
   const [listOfTriggers, setListOfTriggers] = useState<string[]>([defaultTrigger]);
-  const [currentSuggestions, setCurrentSuggestions] = useState<string[]>([]); // Tracks suggestions based on current trigger
-  const [currentOption, setCurrentOption] = useState<TOption>()
-  const [cursorIndex, setCursorIndex] = useState(0);
+  const [currentSuggestionList, setCurrentSuggestionsList] = useState<string[]>([]);
+  const [currentSuggestion, setCurrentSuggestion] = useState<TSuggestion | undefined>();
   const [isFocused, setIsFocused] = useState(false);
+  const [currentTrigger, setCurrentTrigger] = useState<string | undefined>()
 
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const formattedRef = useRef<HTMLDivElement | null>(null);
+  const suggestionsRef = useRef<HTMLUListElement | null>(null);
 
-  // Reset suggestions to top level if at root context ({{context.})
   const resetSuggestions = useCallback(() => {
-    setCurrentSuggestions(options.map(option => option.value));
-  }, [options])
+    setCurrentSuggestionsList(options.map((option) => option.value));
+    setCurrentSuggestion(undefined);
+  }, [options]);
 
-  const onChangeValue = (value: string) => {
-    setValue(value)
-    onChange(value)
-  }
+  const getCursorIndex = () => {
+    if (textareaRef.current) {
+      return textareaRef.current.selectionStart || 0;
+    }
+    return 0;
+  };
 
-  // Handle selection of trigger and suggestion
+  const onChangeValue = (newValue: string) => {
+    setValue(newValue)
+    onChange(newValue)
+  };
+
   const handleSelect = (trigger: string, suggestion: string) => {
-    const input = `${trigger}${suggestion}.`;
-    const beforeCursor = value.substring(0, cursorIndex);
-    const afterCursor = value.substring(cursorIndex);
-  
-    const shouldAddClosing = !listOfTriggers.includes(input);
-  
-    const newValue = `${beforeCursor}${trigger}${suggestion}}}${afterCursor.trimEnd()}`;
-    onChangeValue(newValue);
-    setCursorIndex(beforeCursor.length + trigger.length + suggestion.length + 2);
-  
-    const newTrigger = `${trigger}${suggestion}.`;
-  
-    // Check if the trigger reached the top-level and reset suggestions
-    if (newTrigger === defaultTrigger) {
-      resetSuggestions();
-    } else {
-      // Find the option corresponding to the selected trigger
-      const currentOption = findOptionForTrigger(newTrigger, options);
-      
-      if (currentOption) {
-        setCurrentOption(currentOption)
-        // If the selected option has sub-options, update the suggestions list
-        if (currentOption.options && currentOption.options.length > 0) {
-          setCurrentSuggestions(currentOption.options.map(option => option.value));
+    if (textareaRef.current) {
+      const value = textareaRef.current.value;
+      const cursorIndex = getCursorIndex();
+      const triggerContext = findActiveTriggerContext(value, cursorIndex, listOfTriggers);
+
+      if (triggerContext) {
+        const { startIndex } = triggerContext;
+        const triggerLength = triggerContext.trigger.length;
+
+        const part1 = value.substring(0, startIndex); // Before the trigger
+        const part2 = value.substring(startIndex + triggerLength); // After the trigger
+
+        const newTrigger = `${trigger}${suggestion}.`;
+        const newValue = `${part1}${newTrigger}${part2}`.trimEnd();
+
+        onChangeValue(newValue);
+
+        const activeOption = findSuggestionForTrigger(newTrigger, options, defaultTrigger);
+        if (activeOption && activeOption.options?.length) {
+          setCurrentSuggestion(activeOption);
+          setCurrentSuggestionsList(activeOption.options.map((opt) => opt.value));
         } else {
-          resetSuggestions()
+          resetSuggestions();
         }
+        return `${trigger}${suggestion}`;
       }
     }
-
-    return `${trigger}${suggestion}${shouldAddClosing ? '}}' : ''}`;
-  };
-  
-  const handleChange = (val: string) => {
-    onChangeValue(val);
-    setCursorIndex(val.length);
+    return `${trigger}${suggestion}`;
   };
 
-  // Format the text for display (highlight triggers)
   const formatText = useCallback((text: string) => {
-    const escapedTriggers = listOfTriggers.map(t => t.replace(/[.*+?^=!:${}()|\[\]\/\\]/g, '\\$&'));
-  
-    const regexPattern = `(${escapedTriggers.join('|')})[\\w.-]+}}`; // Match trigger followed by key and closing }}
-    const regex = new RegExp(regexPattern, 'g');
+    const regex = /\{\{(.*?)\}\}/g;
     return text.replace(regex, (match) => `<strong>${match}</strong>`);
-  }, [listOfTriggers]);
+  }, []);
 
-  // Handle click event on formatted text
   const handleFormattedTextClick = () => {
     setIsFocused(true);
-    const textarea = document.querySelector<HTMLTextAreaElement>(".autocomplete-input");
-    if (textarea) {
-      textarea.focus();
-      const valueLength = textarea.value.length;
-      textarea.setSelectionRange(valueLength, valueLength);
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+      const valueLength = textareaRef.current.value.length;
+      textareaRef.current.setSelectionRange(valueLength, valueLength);
     }
   };
 
-  // Update list of triggers and suggestions based on selected context
   useEffect(() => {
-    const triggers = generateTriggers(options);
+    const activeOption = findSuggestionForTrigger(currentTrigger, options, defaultTrigger);
+    if (activeOption) {
+      setCurrentSuggestion(activeOption);
+      setCurrentSuggestionsList(
+        activeOption.options?.map((option) => option.value) || []
+      );
+    } else {
+      resetSuggestions();
+    }
+  }, [currentTrigger, options, defaultTrigger, resetSuggestions]);
+
+  useEffect(() => {
+    const triggers = generateTriggers(options, defaultTrigger);
     setListOfTriggers([defaultTrigger, ...triggers]);
-    resetSuggestions(); // Reset to top-level suggestions on mount
+    resetSuggestions();
   }, [options, resetSuggestions, defaultTrigger]);
 
   useEffect(() => {
+    const suggestionList = suggestionsRef;
     const enhanceSuggestions = () => {
-      const suggestionList = document.querySelector(".react-autocomplete-input");
-
-      if (suggestionList) {
-        const items = suggestionList.querySelectorAll("li");
+      if (suggestionList?.current) {
+        const items = suggestionList.current.querySelectorAll("li");
         items.forEach((item) => {
           const suggestionText = item.textContent?.trim();
-          const activeOptions = currentOption?.options || options;
-          const option = activeOptions.find(opt => opt.value === suggestionText)
+          const activeOptions = currentSuggestion?.options || options;
+          const option = activeOptions.find((opt) => opt.value === suggestionText);
 
           if (option) {
-            const flexContainer = createFlexContainer()
-            const suggestionSpan = createSuggestionSpan(item.textContent?.trim() || "")
+            const flexContainer = createFlexContainer();
+            const suggestionSpan = createSuggestionSpan(item.textContent?.trim() || "");
             const customSpan = createCustomSpan(option.type);
 
-            // Append both spans to the flex container
             flexContainer.appendChild(suggestionSpan);
             flexContainer.appendChild(customSpan);
 
-            // Clear item content and replace it with flex container
             item.textContent = "";
             item.appendChild(flexContainer);
           }
@@ -131,37 +154,74 @@ const AutocompleteTextArea = ({ options, onChange, defaultTrigger = DEFAULT_TRIG
       }
     };
 
-    enhanceSuggestions();
-  }, [options, value, currentSuggestions, currentOption]);
+    const timeoutId = setTimeout(enhanceSuggestions, 200);
+    return () => clearTimeout(timeoutId);
+  }, [options, value, currentSuggestionList, currentSuggestion]);
+
+  // Effect to synchronize scroll positions in textarea and formattedText div
+  useEffect(() => {
+  const textarea = textareaRef.current;
+  const formattedDiv = formattedRef.current;
+
+  if (textarea && formattedDiv) {
+    const syncScroll = (source: HTMLElement, target: HTMLElement) => {
+      target.scrollTop = source.scrollTop;
+    };
+
+    const handleTextareaScroll = () => syncScroll(textarea, formattedDiv);
+    const handleDivScroll = () => syncScroll(formattedDiv, textarea);
+
+    textarea.addEventListener("scroll", handleTextareaScroll);
+    formattedDiv.addEventListener("scroll", handleDivScroll);
+
+    return () => {
+      textarea.removeEventListener("scroll", handleTextareaScroll);
+      formattedDiv.removeEventListener("scroll", handleDivScroll);
+    };
+  }
+}, [textareaRef, formattedRef]);
 
   return (
-    <div className="autocomplete-container">
+    <div className="relative w-full flex flex-col overflow-hidden min-h-28 flex-1" id={id}>
       <AutocompleteInput
         spacer=""
+        defaultValue={initialValue}
+        Component={ForwardedTextarea}
         matchAny={true}
         trigger={listOfTriggers}
-        options={currentSuggestions}
+        options={currentSuggestionList}
         value={value}
-        onChange={handleChange}
+        onChange={onChangeValue}
         changeOnSelect={handleSelect}
-        className={`autocomplete-input plain-textarea ${
-          isFocused ? "" : "hidden"
+        className={`absolute top-0 left-0 w-full z-20 p-2 bg-transparent h-full border border-gray-300 rounded-sm text-sm leading-6 ${
+          isFocused ? "" : "opacity-0 pointer-events-none"
         }`}
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
+        onHandleCurrentTrigger={(trigger: string) => setCurrentTrigger(trigger)}
+        ref={textareaRef}
+        suggestionsRef={suggestionsRef}
+        maxOptions={50}
+        offsetY={-20}
       />
       <div
-        className={`formatted-text ${isFocused ? "" : "visible"}`}
+        className={`absolute top-0 left-0 w-full p-2 whitespace-pre-wrap break-words h-full overflow-y-auto text-sm leading-6 bg-white border border-gray-300 rounded-sm ${
+          isFocused ? "invisible" : "visible"
+        }`}
         ref={formattedRef}
-        onMouseDown={(e) => e.preventDefault()}
+        onMouseDown={(e) => {
+          e.preventDefault();
+          if (textareaRef.current) {
+            textareaRef.current.focus();
+          }
+        }}
         onClick={handleFormattedTextClick}
       >
-        <span
-          dangerouslySetInnerHTML={{ __html: formatText(value) }}
-        />
+        <span dangerouslySetInnerHTML={{ __html: formatText(value) }} />
       </div>
     </div>
-  );
+);
+
 };
 
 export default AutocompleteTextArea;

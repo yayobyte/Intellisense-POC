@@ -1,5 +1,6 @@
-export type TOption = {
+export type TSuggestion = {
     value: string;
+    trigger?: string;
     type: string;
-    options?: TOption[];
+    options?: TSuggestion[];
 };

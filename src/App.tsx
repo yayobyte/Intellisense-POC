@@ -1,7 +1,7 @@
 import AutocompleteTextarea from "./AutocompleteTextArea";
-import { TOption } from "./AutocompleteTextArea.types";
+import { TSuggestion } from "./AutocompleteTextArea.types";
 
-const options: TOption[] = [
+const options: TSuggestion[] = [
   {
     type: 'entity',
     value: 'customer',
@@ -31,7 +31,13 @@ const options: TOption[] = [
 
 const App = () => {
   return (
-    <AutocompleteTextarea options={options} onChange={() => {}} defaultTrigger="{{context." />
+    <div className="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden md:max-w-2xl p-8">
+      <h1 className="text-3xl font-bold underline mb-8">
+        Intellisense React
+      </h1>
+      <AutocompleteTextarea options={options} onChange={() => {}} defaultTrigger="{{context." />
+    </div>
+    
   );
 };
 

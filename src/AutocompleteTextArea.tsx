@@ -112,7 +112,7 @@ const AutocompleteTextArea = ({
   };
 
   useEffect(() => {
-    const activeOption = findSuggestionForTrigger(currentTrigger, options, defaultTrigger);
+    const activeOption = findSuggestionForTrigger(currentTrigger || '', options, defaultTrigger);
     if (activeOption) {
       setCurrentSuggestion(activeOption);
       setCurrentSuggestionsList(

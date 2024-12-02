@@ -41,7 +41,7 @@ import type {
     onKeyDown?: (...args: any[]) => void;
     onRequestOptions?: (value: string) => void;
     onSelect?: (...args: any[]) => void;
-    changeOnSelect?: (trigger: string | string[], slug: string) => string;
+    changeOnSelect?: (trigger: string, slug: string) => string;
     options?: Record<string, string[]> | string[];
     regex?: string;
     matchAny?: boolean;
@@ -57,7 +57,7 @@ import type {
     triggerMatchWholeWord?: boolean;
     triggerCaseInsensitive?: boolean;
     onHandleCurrentTrigger?: (trigger: string) => void
-    suggestionsRef?: MutableRefObject<HTMLUListElement>
+    suggestionsRef?: MutableRefObject<HTMLUListElement | null>
   } & Omit<ComponentProps<any>, "onChange">;
 
   export const TextAreaAutocomplete = forwardRef<HTMLInputElement, TextAreaAutocompleteProps<any>>(
@@ -72,7 +72,7 @@ import type {
         onKeyDown,
         onRequestOptions,
         onSelect,
-        changeOnSelect = (trigger, slug) => trigger + slug,
+        changeOnSelect = (trigger: string, slug: string) => trigger + slug,
         options = [],
         regex = "^[A-Za-z0-9\\-_.!]+$",
         matchAny,
@@ -312,26 +312,6 @@ import type {
         }
       };
 
-      useEffect(() => {
-        const list = refParent.current;
-        if (list) {
-          list.scrollTop = 15; // Ensure it starts at the top on every render
-        }
-      }, [options]);
-
-      useEffect(() => {
-        const list = refParent.current;
-        if (!list) return;
-      
-        const lockScroll = () => {
-          requestAnimationFrame(() => {
-            list.scrollTop = 0; // Lock scroll to the top
-          });
-        };
-      
-        list.addEventListener("scroll", lockScroll);
-        return () => list.removeEventListener("scroll", lockScroll);
-      }, []);
       
       useEffect(() => {
         if (selection >= 0) {
@@ -536,7 +516,7 @@ import type {
       };
 
       const renderAutocompleteList = () => {
-        if (false) {
+        if (!helperVisible) {
           return null;
         }
 

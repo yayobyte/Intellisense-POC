@@ -19,9 +19,7 @@ import { forwardRef, useCallback, useEffect, useRef, useState } from "react";
 import { debounce } from "throttle-debounce";
 import getCaretCoordinates from "textarea-caret";
 import getInputSelection, { setCaretPosition } from "get-input-selection";
-import scrollIntoView from "scroll-into-view-if-needed";
 import { findActiveTriggerContext } from "./helpers";
-// TODO check if we can use the native scrollIntoView and remove this lib
 
 const KEY_UP = 38;
 const KEY_DOWN = 40;
@@ -317,16 +315,6 @@ export const TextAreaAutocomplete = forwardRef<HTMLInputElement, TextAreaAutocom
     };
 
     useEffect(() => {
-      if (selection >= 0) {
-        const selectedItem = refParent.current?.children[selection];
-        selectedItem?.scrollIntoView({
-          behavior: "smooth",
-          block: "nearest",
-        });
-      }
-    }, [selection]);
-
-    useEffect(() => {
       if (stateOptions.length && refParent.current) {
         refParent.current.focus();
       }
@@ -348,9 +336,10 @@ export const TextAreaAutocomplete = forwardRef<HTMLInputElement, TextAreaAutocom
 
     useEffect(() => {
       if (helperVisible && refCurrent.current) {
-        scrollIntoView(refCurrent.current, {
-          boundary: refParent?.current,
-          scrollMode: "if-needed",
+        refCurrent.current.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+          inline: "nearest",
         });
       }
     }, [helperVisible]);

@@ -112,7 +112,7 @@ const AutocompleteTextArea = ({
   };
 
   useEffect(() => {
-    const activeOption = findSuggestionForTrigger(currentTrigger || '', options, defaultTrigger);
+    const activeOption = findSuggestionForTrigger(currentTrigger, options, defaultTrigger);
     if (activeOption) {
       setCurrentSuggestion(activeOption);
       setCurrentSuggestionsList(
@@ -181,6 +181,29 @@ const AutocompleteTextArea = ({
   }
 }, [textareaRef, formattedRef]);
 
+  //Effect to detect when the user cancels suggestions or presses backspace
+  useEffect(() => {
+  const handleKeyDown = (event: KeyboardEvent) => {
+    if (event.key === "Backspace" && textareaRef.current) {
+      const cursorIndex = getCursorIndex();
+      const value = textareaRef.current.value;
+      const triggerContext = findActiveTriggerContext(value, cursorIndex, listOfTriggers);
+
+      if (triggerContext) {
+        setCurrentTrigger(triggerContext.trigger);
+      } else {
+        resetSuggestions();
+        setCurrentTrigger(undefined);
+      }
+    }
+  };
+
+  document.addEventListener("keydown", handleKeyDown);
+  return () => {
+    document.removeEventListener("keydown", handleKeyDown);
+  };
+}, [listOfTriggers, resetSuggestions]);
+
   return (
     <div className="relative w-full flex flex-col overflow-hidden min-h-28 flex-1" id={id}>
       <AutocompleteInput
@@ -198,7 +221,7 @@ const AutocompleteTextArea = ({
         }`}
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
-        onHandleCurrentTrigger={(trigger: string) => setCurrentTrigger(trigger)}
+        onHandleCurrentTrigger={(trigger) => setCurrentTrigger(trigger)}
         ref={textareaRef}
         suggestionsRef={suggestionsRef}
         maxOptions={50}

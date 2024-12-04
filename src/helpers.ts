@@ -81,7 +81,7 @@ export const findOptionRecursive = (value: string, options: TSuggestion[]): TSug
     // Find the last trigger before the cursor
     for (let i = cursorIndex; i >= 0; i--) {
       const slice = text.slice(i, cursorIndex);
-      if (listOfTriggers.includes(slice)) {
+      if (slice.length > 0 && listOfTriggers.includes(slice)) {
         return { trigger: slice, startIndex: i };
       }
     }

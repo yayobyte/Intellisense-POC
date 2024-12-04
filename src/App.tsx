@@ -1,7 +1,7 @@
 import AutocompleteTextarea from "./AutocompleteTextArea";
-import { generateMockSuggestions } from "./mockData";
+import { generateMockSuggestions, mockedOptions } from "./mockData";
 
-const options = generateMockSuggestions()
+const options = mockedOptions
 
 const App = () => {
   console.log(options)

@@ -19,7 +19,17 @@ import { forwardRef, useCallback, useEffect, useRef, useState } from "react";
 import { debounce } from "throttle-debounce";
 import getCaretCoordinates from "textarea-caret";
 import getInputSelection, { setCaretPosition } from "get-input-selection";
-import { findActiveTriggerContext } from "./helpers";
+
+const findActiveTriggerContext = (text: string, cursorIndex: number, listOfTriggers: string[]) => {
+  // Find the last trigger before the cursor
+  for (let i = cursorIndex; i >= 0; i--) {
+    const slice = text.slice(i, cursorIndex);
+    if (slice.length > 0 && listOfTriggers.includes(slice)) {
+      return { trigger: slice, startIndex: i };
+    }
+  }
+  return null;
+};
 
 const KEY_UP = 38;
 const KEY_DOWN = 40;
@@ -56,7 +66,6 @@ export type TextAreaAutocompleteProps<C extends string | ForwardRefExoticCompone
   passThroughTab?: boolean;
   triggerMatchWholeWord?: boolean;
   triggerCaseInsensitive?: boolean;
-  onHandleCurrentTrigger?: (trigger: string) => void
   suggestionsRef?: MutableRefObject<HTMLUListElement>
 } & Omit<ComponentProps<any>, "onChange">;
 
@@ -88,7 +97,6 @@ export const TextAreaAutocomplete = forwardRef<HTMLInputElement, TextAreaAutocom
       triggerMatchWholeWord,
       triggerCaseInsensitive,
       suggestionsRef: refParent,
-      onHandleCurrentTrigger,
       ...rest
     },
     ref
@@ -299,7 +307,6 @@ export const TextAreaAutocomplete = forwardRef<HTMLInputElement, TextAreaAutocom
           setTop(newTop);
           setLeft(isCloseToEnd ? newLeft - 175 : newLeft);
           setStateTrigger(slug.trigger);
-          onHandleCurrentTrigger(slug.trigger)
           setStateOptions(slug.options);
           setMatchLength(slug.matchLength);
           setMatchStart(slug.matchStart);
@@ -313,6 +320,7 @@ export const TextAreaAutocomplete = forwardRef<HTMLInputElement, TextAreaAutocom
         setStateTrigger(null);
       }
     };
+
 
     useEffect(() => {
       if (stateOptions.length && refParent.current) {
@@ -428,6 +436,7 @@ export const TextAreaAutocomplete = forwardRef<HTMLInputElement, TextAreaAutocom
 
     const handleSelection = (idx: number) => {
       const slug = stateOptions[idx]; // Selected suggestion
+      if (!slug) { return } // Prevents error when pressing enter just right after the final suggestion
       const value = recentValue.current!;
       const triggerLength = stateTrigger?.length || 0;
 
@@ -568,8 +577,6 @@ export const TextAreaAutocomplete = forwardRef<HTMLInputElement, TextAreaAutocom
                 </p>
               </li>
             );
-
-
         });
 
       /* FIXME: de-hardcode that 5 pixels margin */
@@ -578,7 +585,7 @@ export const TextAreaAutocomplete = forwardRef<HTMLInputElement, TextAreaAutocom
 
       return (
           <ul
-            className="bg-white border border-black/15 shadow-lg fixed text-left z-[20000] list-none mt-4 p-0 text-md max-h-36 overflow-y-auto focus:outline-none"
+            className="bg-white border border-black/15 shadow-lg fixed text-left z-[20000] list-none mt-4 p-0 text-md max-h-80 overflow-y-auto focus:outline-none"
             style={{
               left: left + offsetX,
               top: top + offsetY,

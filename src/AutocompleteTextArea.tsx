@@ -7,7 +7,7 @@ import {
 } from "react";
 import AutocompleteInput from "./AutocompleteTextAreaCore";
 import { TSuggestion } from "./AutocompleteTextArea.types";
-import { createCustomSpan, createFlexContainer, createSuggestionSpan, findOptionForTrigger as findSuggestionForTrigger, generateTriggers, findActiveTriggerContext } from "./helpers";
+import { createCustomSpan, createFlexContainer, createSuggestionSpan, findTriggerInOptions } from "./helpers";
 
 type TextareaProps = React.TextareaHTMLAttributes<HTMLTextAreaElement>;
 
@@ -43,7 +43,6 @@ const AutocompleteTextArea = ({
   const [currentSuggestionList, setCurrentSuggestionsList] = useState<string[]>([]);
   const [currentSuggestion, setCurrentSuggestion] = useState<TSuggestion | undefined>();
   const [isFocused, setIsFocused] = useState(false);
-  const [currentTrigger, setCurrentTrigger] = useState<string | undefined>()
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const formattedRef = useRef<HTMLDivElement | null>(null);
@@ -52,6 +51,7 @@ const AutocompleteTextArea = ({
   const resetSuggestions = useCallback(() => {
     setCurrentSuggestionsList(options.map((option) => option.value));
     setCurrentSuggestion(undefined);
+    setListOfTriggers([defaultTrigger]);
   }, [options]);
 
   const getCursorIndex = () => {
@@ -62,38 +62,11 @@ const AutocompleteTextArea = ({
   };
 
   const onChangeValue = (newValue: string) => {
-    setValue(newValue)
-    onChange(newValue)
+    setValue(newValue);
+    onChange(newValue);
   };
 
   const handleSelect = (trigger: string, suggestion: string) => {
-    if (textareaRef.current) {
-      const value = textareaRef.current.value;
-      const cursorIndex = getCursorIndex();
-      const triggerContext = findActiveTriggerContext(value, cursorIndex, listOfTriggers);
-
-      if (triggerContext) {
-        const { startIndex } = triggerContext;
-        const triggerLength = triggerContext.trigger.length;
-
-        const part1 = value.substring(0, startIndex); // Before the trigger
-        const part2 = value.substring(startIndex + triggerLength); // After the trigger
-
-        const newTrigger = `${trigger}${suggestion}.`;
-        const newValue = `${part1}${newTrigger}${part2}`.trimEnd();
-
-        onChangeValue(newValue);
-
-        const activeOption = findSuggestionForTrigger(newTrigger, options, defaultTrigger);
-        if (activeOption && activeOption.options?.length) {
-          setCurrentSuggestion(activeOption);
-          setCurrentSuggestionsList(activeOption.options.map((opt) => opt.value));
-        } else {
-          resetSuggestions();
-        }
-        return `${trigger}${suggestion}`;
-      }
-    }
     return `${trigger}${suggestion}`;
   };
 
@@ -112,23 +85,25 @@ const AutocompleteTextArea = ({
   };
 
   useEffect(() => {
-    const activeOption = findSuggestionForTrigger(currentTrigger, options, defaultTrigger);
-    if (activeOption) {
-      setCurrentSuggestion(activeOption);
-      setCurrentSuggestionsList(
-        activeOption.options?.map((option) => option.value) || []
-      );
+    const cursorIndex = getCursorIndex();
+    const triggerContext = findTriggerInOptions(value, cursorIndex, options, defaultTrigger);
+
+    if (triggerContext) {
+      const { trigger, option } = triggerContext;
+      const activeOption = option;
+      if (activeOption && activeOption.options?.length) {
+        setCurrentSuggestion(activeOption);
+        setCurrentSuggestionsList(activeOption.options.map((opt) => opt.value));
+        setListOfTriggers([trigger]);
+      } else {
+        resetSuggestions();
+      }
     } else {
       resetSuggestions();
     }
-  }, [currentTrigger, options, defaultTrigger, resetSuggestions]);
+  }, [value, options, defaultTrigger ])
 
-  useEffect(() => {
-    const triggers = generateTriggers(options, defaultTrigger);
-    setListOfTriggers([defaultTrigger, ...triggers]);
-    resetSuggestions();
-  }, [options, resetSuggestions, defaultTrigger]);
-
+  //Append type of suggestion to the library
   useEffect(() => {
     const suggestionList = suggestionsRef;
     const enhanceSuggestions = () => {
@@ -181,29 +156,6 @@ const AutocompleteTextArea = ({
   }
 }, [textareaRef, formattedRef]);
 
-  //Effect to detect when the user cancels suggestions or presses backspace
-  useEffect(() => {
-  const handleKeyDown = (event: KeyboardEvent) => {
-    if (event.key === "Backspace" && textareaRef.current) {
-      const cursorIndex = getCursorIndex();
-      const value = textareaRef.current.value;
-      const triggerContext = findActiveTriggerContext(value, cursorIndex, listOfTriggers);
-
-      if (triggerContext) {
-        setCurrentTrigger(triggerContext.trigger);
-      } else {
-        resetSuggestions();
-        setCurrentTrigger(undefined);
-      }
-    }
-  };
-
-  document.addEventListener("keydown", handleKeyDown);
-  return () => {
-    document.removeEventListener("keydown", handleKeyDown);
-  };
-}, [listOfTriggers, resetSuggestions]);
-
   return (
     <div className="relative w-full flex flex-col overflow-hidden min-h-28 flex-1" id={id}>
       <AutocompleteInput
@@ -221,7 +173,6 @@ const AutocompleteTextArea = ({
         }`}
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
-        onHandleCurrentTrigger={(trigger) => setCurrentTrigger(trigger)}
         ref={textareaRef}
         suggestionsRef={suggestionsRef}
         maxOptions={50}

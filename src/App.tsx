@@ -1,5 +1,5 @@
 import AutocompleteTextarea from "./AutocompleteTextArea";
-import { generateMockSuggestions, mockedOptions } from "./mockData";
+import { mockedOptions } from "./mockData";
 
 const options = mockedOptions
 

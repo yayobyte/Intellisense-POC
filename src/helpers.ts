@@ -1,24 +1,5 @@
 import { TSuggestion } from "./AutocompleteTextArea.types";
 
-// Recursive function to generate the list of triggers
-export const findOptionForTrigger = (
-  trigger: string,
-  options: TSuggestion[],
-  defaultTrigger: string
-): TSuggestion | null => {
-  for (const option of options) {
-    if (`${defaultTrigger}${option.trigger}` === trigger) {
-      return option;
-    }
-    // Recurse deeper if the option has sub-options
-    if (option.options) {
-      const found = findOptionForTrigger(trigger, option.options, defaultTrigger);
-      if (found) return found;
-    }
-  }
-  return null;
-};
-
 export function createFlexContainer(): HTMLDivElement {
   const flexContainer = document.createElement("div");
   flexContainer.className = "suggestion-content";
@@ -43,27 +24,6 @@ export function createCustomSpan(type: string): HTMLSpanElement {
   customSpan.style.fontWeight = "400";
   return customSpan;
 }
-
-export const getActiveOption = (
-  value: string,
-  options: TSuggestion[],
-): TSuggestion | null => {
-  const parts = value.split(/[\.\(]/);
-  let currentOptions = options;
-  for (const part of parts) {
-    const option = currentOptions.find(opt => opt.value === part);
-    if (option) {
-      if (option.options) {
-        currentOptions = option.options;
-      } else {
-        return option;
-      }
-    } else {
-      return null;
-    }
-  }
-  return null;
-};
 
 export const findTriggerInOptions = (
   text: string,

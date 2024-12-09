@@ -17,7 +17,7 @@ const ForwardedTextarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
       {...props}
       ref={ref}
       rows={4}
-      className={`${className} focus:outline-none focus:ring-8 focus:ring-gray-400 focus:border-gray-400 rounded-md focus:rounded-md h-full`} />;
+      className={`${className} focus:outline-none rounded-sm focus:border-gray-400 h-full`} />;
   }
 );
 
@@ -168,7 +168,7 @@ const AutocompleteTextArea = ({
         value={value}
         onChange={onChangeValue}
         changeOnSelect={handleSelect}
-        className={`absolute top-0 left-0 w-full z-20 p-2 bg-transparent h-full border border-gray-300 rounded-sm text-sm leading-6 ${
+        className={`absolute top-0 left-0 w-full z-20 p-2 bg-transparent h-full border border-gray-300 text-sm leading-6 ${
           isFocused ? "" : "opacity-0 pointer-events-none"
         }`}
         onFocus={() => setIsFocused(true)}

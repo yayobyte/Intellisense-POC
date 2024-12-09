@@ -579,18 +579,34 @@ export const TextAreaAutocomplete = forwardRef<HTMLInputElement, TextAreaAutocom
             );
         });
 
-      /* FIXME: de-hardcode that 5 pixels margin */
-      const maxWidth = window.innerWidth - left - offsetX - 5;
-      const maxHeight = window.innerHeight - top - offsetY - 5;
+      const BORDER_WIDTH = 1; // 1px border
+      const PADDING = 16; // 4rem = 16px
+      const MARGIN = 16; // 5px safety margin
+      const MIN_HEIGHT = 50; // Minimum height for the dropdown
+      const MAX_HEIGHT = 200; // Maximum height for the dropdown
+      const MAX_VISIBLE_ITEMS = 5; // Maximum number of items to show before scrolling
+      const ITEM_HEIGHT = 20; // Height in pixels for each dropdown item
+
+      // Calculate dimensions
+      const maxWidth = window.innerWidth - left - offsetX - (2 * BORDER_WIDTH) - (2 * PADDING) - MARGIN;
+      const maxHeight = Math.min(
+        window.innerHeight - top - offsetY - (2 * BORDER_WIDTH) - (2 * PADDING) - MARGIN,
+        stateOptions.length > MAX_VISIBLE_ITEMS ? MAX_HEIGHT : MIN_HEIGHT + (stateOptions.length * ITEM_HEIGHT)
+      );
 
       return (
           <ul
-            className="bg-white border border-black/15 shadow-lg fixed text-left z-[20000] list-none mt-4 p-0 text-md max-h-80 overflow-y-auto focus:outline-none"
+            className="bg-white border border-black/15 shadow-lg fixed text-left z-[20000] list-none mt-4 p-0 text-md 
+                       overflow-y-auto overflow-x-hidden focus:outline-none"
             style={{
               left: left + offsetX,
               top: top + offsetY,
               maxHeight,
               maxWidth,
+              minHeight: MIN_HEIGHT,
+              boxSizing: 'border-box',
+              overscrollBehavior: 'contain',
+              WebkitOverflowScrolling: 'touch'
             }}
             ref={refParent}
             id="suggestions-list"
@@ -602,6 +618,7 @@ export const TextAreaAutocomplete = forwardRef<HTMLInputElement, TextAreaAutocom
               e.preventDefault();
               e.stopPropagation();
             }}
+            onScroll={(e) => e.stopPropagation()}
           >
             {helperOptions}
           </ul>

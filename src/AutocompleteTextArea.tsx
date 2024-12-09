@@ -25,16 +25,14 @@ type AutocompleteTextAreaProps = {
   initialValue?: string;
   options: TSuggestion[];
   onChange: (value: string) => void;
-  defaultTrigger?: string;
+  defaultTrigger: string;
   id?: string;
 };
-
-const DEFAULT_TRIGGER = '{{context.';
 
 const AutocompleteTextArea = ({
   options,
   onChange,
-  defaultTrigger = DEFAULT_TRIGGER,
+  defaultTrigger,
   initialValue = "",
   id = "",
 }: AutocompleteTextAreaProps) => {
@@ -67,7 +65,17 @@ const AutocompleteTextArea = ({
   };
 
   const handleSelect = (trigger: string, suggestion: string) => {
-    return `${trigger}${suggestion}`;
+    let suggestedValue = suggestion;
+    const cursorIndex = getCursorIndex()
+    const { option } = findTriggerInOptions(value, cursorIndex, options, defaultTrigger);
+    //if type is function, add parenthesis and close the subsequent suggestions
+    if (option?.options){
+      const suggestionOption = option.options.find((opt) => opt.value === suggestion);
+      if (suggestionOption?.type === 'function') {
+        suggestedValue = `${suggestion}()}}`;
+      }
+    }
+    return `${trigger}${suggestedValue}`;
   };
 
   const formatText = useCallback((text: string) => {
